@@ -9,7 +9,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
       CF_IDENTIFIER: ${{ secrets.CF_IDENTIFIER }}
       ADLIST_URLS: ${{ vars.ADLIST_URLS }}
@@ -28,9 +27,18 @@ jobs:
         with:
           python-version: 3.11
         
+      - name: Cache Data
+        id: cache-cloudflare-data
+        uses: actions/cache@main
+        with:
+          path: cloudflare_data.txt
+          key: ${{ runner.os }}-cloudflare-data-${{ github.run_id }}
+          restore-keys: |
+            ${{ runner.os }}-cloudflare-data-
+      
       - name: Cloudflare Gateway Zero Trust 
         run: python -m src run
-          
+      
       - name: Delete workflow runs
         uses: Mattraks/delete-workflow-runs@v2
         with:
