@@ -1,5 +1,6 @@
 import os
 import argparse
+from concurrent.futures import ThreadPoolExecutor
 from src.domains import DomainConverter
 from src.cloudflare import (
     get_lists, get_rules, create_list, update_list, create_rule, 
@@ -21,7 +22,24 @@ class CloudflareManager:
         current_lists = get_lists(self.list_name)
         current_rules = get_rules(self.rule_name)
 
-        list_id_to_domains = {lst_id: set(domains) for lst_id, domains in self.data_handler.data.items()}
+        # Initialize list_id_to_domains
+        list_id_to_domains = {}
+
+        # Populate the list_id_to_domains dictionary using data from data_handler or fetch online if not available
+        with ThreadPoolExecutor() as executor:
+            futures = {}
+            for lst in current_lists:
+                if lst["id"] in self.data_handler.data:
+                    list_id_to_domains[lst["id"]] = set(self.data_handler.data[lst["id"]])
+                else:
+                    futures[executor.submit(get_list_items, lst["id"])] = lst["id"]
+
+            for future in futures:
+                lst_id = futures[future]
+                items = future.result()
+                list_id_to_domains[lst_id] = set(items)
+                self.data_handler.data[lst_id] = items  # Save fetched data to the handler
+
         domain_to_list_id = {domain: lst_id for lst_id, domains in list_id_to_domains.items() for domain in domains}
         remaining_domains = set(domains_to_block) - set(domain_to_list_id.keys())
 
@@ -72,9 +90,16 @@ class CloudflareManager:
         else:
             rule = create_rule(self.rule_name, new_list_ids)
             info(f"Created rule {rule['name']}")
-          
+
+        # Delete excess lists that are no longer needed
+        excess_lists = [lst for lst in current_lists if lst["id"] not in new_list_ids]
+        for lst in excess_lists:
+            delete_list(lst["id"])
+            self.data_handler.data.pop(lst["id"], None)
+            info(f"Deleted excess list: {lst['name']}")
+
+        # Save the updated data after processing
         self.data_handler.save_data()
-            
 
     def delete_resources(self):
         current_lists = get_lists(self.list_name)
