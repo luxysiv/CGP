@@ -111,18 +111,8 @@ def main():
 
     if args.action == "run":
         cloudflare_manager.update_resources()
-
-        utils.configure_git_user()
-        utils.add_and_commit("cloudflare_data.txt", "Update Cloudflare data")
-        utils.push_changes("main")
-
     elif args.action == "leave":
-        cloudflare_manager.delete_resources()
-
-        utils.configure_git_user()
-        utils.add_and_commit("cloudflare_data.txt", "Clear Cloudflare data")
-        utils.push_changes("main")
-        
+        cloudflare_manager.delete_resources()        
     else:
         error("Invalid action. Please choose either 'run' or 'leave'.")
 
