@@ -18,18 +18,23 @@ class CloudflareManager:
         if len(domains_to_block) > 300000:
             error("The domains list exceeds Cloudflare Gateway's free limit of 300,000 domains.")
 
-        current_lists = get_lists(self.list_name)
-        current_rules = get_rules(self.rule_name)
+        current_lists = self.data_handler.get_current_lists()
+        if current_lists is None:
+            current_lists = get_lists(self.list_name)
+            self.data_handler.update_cache(current_lists, self.data_handler.get_current_rules())
 
-        list_id_to_domains = {}
+        current_rules = self.data_handler.get_current_rules()
+        if current_rules is None:
+            current_rules = get_rules(self.rule_name)
+            self.data_handler.update_cache(self.data_handler.get_current_lists(), current_rules)
+
+        list_id_to_domains = self.data_handler.get_cached_domain_mapping()
 
         for lst in current_lists:
-            if lst["id"] in self.data_handler.data:
-                list_id_to_domains[lst["id"]] = set(self.data_handler.data[lst["id"]])
-            else:
+            if lst["id"] not in list_id_to_domains:
                 items = get_list_items(lst["id"])
                 list_id_to_domains[lst["id"]] = set(items)
-                self.data_handler.data[lst["id"]] = items
+                self.data_handler.update_data(lst["id"], items)
 
         domain_to_list_id = {domain: lst_id for lst_id, domains in list_id_to_domains.items() for domain in domains}
         remaining_domains = set(domains_to_block) - set(domain_to_list_id.keys())
@@ -45,8 +50,8 @@ class CloudflareManager:
             if list_name in list_name_to_id:
                 list_id = list_name_to_id[list_name]
                 current_values = list_id_to_domains.get(list_id, set())
-                remove_items = current_values - set(domains_to_block)
-                chunk = current_values - remove_items
+                remove_items = set(current_values) - set(domains_to_block)
+                chunk = set(current_values) - remove_items
 
                 new_items = []
                 if len(chunk) < 1000:
@@ -71,6 +76,9 @@ class CloudflareManager:
                     info(f"Created list: {lst['name']}")
                     new_list_ids.append(lst["id"])
 
+                current_lists.append(lst)
+                self.data_handler.update_cache(current_lists, current_rules)
+
         cgp_rule = next((rule for rule in current_rules if rule["name"] == self.rule_name), None)
         cgp_list_ids = utils.extract_list_ids(cgp_rule)
 
@@ -78,16 +86,17 @@ class CloudflareManager:
             if set(new_list_ids) != cgp_list_ids:
                 update_rule(self.rule_name, cgp_rule["id"], new_list_ids)
                 info(f"Updated rule {cgp_rule['name']}")
+                self.data_handler.update_cache(current_lists, get_rules(self.rule_name))
         else:
             rule = create_rule(self.rule_name, new_list_ids)
             info(f"Created rule {rule['name']}")
+            self.data_handler.update_cache(current_lists, get_rules(self.rule_name))
 
         self.data_handler.save_data()
 
     def delete_resources(self):
-        current_lists = get_lists(self.list_name)
-        current_rules = get_rules(self.rule_name)
-        current_lists.sort(key=utils.safe_sort_key)
+        current_lists = self.data_handler.get_current_lists() or get_lists(self.list_name)
+        current_rules = self.data_handler.get_current_rules() or get_rules(self.rule_name)
 
         for rule in current_rules:
             delete_rule(rule["id"])
@@ -98,6 +107,7 @@ class CloudflareManager:
             self.data_handler.data.pop(lst["id"], None)
             info(f"Deleted list: {lst['name']}")
 
+        self.data_handler.update_cache([], [])
         self.data_handler.save_data()
 
 

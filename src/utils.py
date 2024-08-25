@@ -5,23 +5,39 @@ import subprocess
 import http.client
 from src import ids_pattern, info, silent_error, CACHE_FILE
 
+
 class DataHandler:
-    def __init__(self):
+    def __init__(self, cache_file=CACHE_FILE):
+        self.cache_file = cache_file
         self.data = self.load_data()
 
     def load_data(self):
-        if os.path.exists(CACHE_FILE):
-            with open(CACHE_FILE, 'r') as f:
+        if os.path.exists(self.cache_file):
+            with open(self.cache_file, 'r') as f:
                 return json.load(f)
         return {}
 
     def save_data(self):
-        with open(CACHE_FILE, 'w') as f:
-            json.dump(self.data, f)
+        with open(self.cache_file, 'w') as f:
+            json.dump(self.data, f, indent=2)
+
+    def get_current_lists(self):
+        return self.data.get('current_lists', None)
+
+    def get_current_rules(self):
+        return self.data.get('current_rules', None)
+
+    def update_cache(self, current_lists, current_rules):
+        self.data['current_lists'] = current_lists
+        self.data['current_rules'] = current_rules
+        self.save_data()
 
     def update_data(self, list_id, domains):
         self.data[list_id] = list(domains)
         self.save_data()
+
+    def get_cached_domain_mapping(self):
+        return {list_id: set(domains) for list_id, domains in self.data.items() if list_id not in ['current_lists', 'current_rules']}
 
 def safe_sort_key(list_item):
     match = re.search(r'\d+', list_item["name"])
