@@ -3,42 +3,45 @@ import re
 import json
 import subprocess
 import http.client
+from pathlib import Path
 from src import ids_pattern, info, silent_error, CACHE_FILE
+from src.cloudflare import get_lists, get_rules, get_list_items
 
 
-class DataHandler:
-    def __init__(self, cache_file=CACHE_FILE):
-        self.cache_file = cache_file
-        self.data = self.load_data()
+def load_cache():
+    if os.path.exists(CACHE_FILE):
+        with open(CACHE_FILE, 'r') as file:
+            return json.load(file)
+    return {"lists": [], "rules": [], "mapping": {}}
 
-    def load_data(self):
-        if os.path.exists(self.cache_file):
-            with open(self.cache_file, 'r') as f:
-                return json.load(f)
-        return {}
+def save_cache(cache):
+    with open(CACHE_FILE, 'w') as file:
+        json.dump(cache, file)
 
-    def save_data(self):
-        with open(self.cache_file, 'w') as f:
-            json.dump(self.data, f, indent=2)
+def get_current_lists(cache, list_name):
+    if cache["lists"]:
+        return cache["lists"]
+    current_lists = get_lists(list_name)
+    cache["lists"] = current_lists
+    save_cache(cache)
+    return current_lists
 
-    def get_current_lists(self):
-        return self.data.get('current_lists', None)
+def get_current_rules(cache, rule_name):
+    if cache["rules"]:
+        return cache["rules"]
+    current_rules = get_rules(rule_name)
+    cache["rules"] = current_rules
+    save_cache(cache)
+    return current_rules
 
-    def get_current_rules(self):
-        return self.data.get('current_rules', None)
-
-    def update_cache(self, current_lists, current_rules):
-        self.data['current_lists'] = current_lists
-        self.data['current_rules'] = current_rules
-        self.save_data()
-
-    def update_data(self, list_id, domains):
-        self.data[list_id] = list(domains)
-        self.save_data()
-
-    def get_cached_domain_mapping(self):
-        return {list_id: set(domains) for list_id, domains in self.data.items() if list_id not in ['current_lists', 'current_rules']}
-
+def get_list_items_cached(cache, list_id):
+    if list_id in cache["mapping"]:
+        return cache["mapping"][list_id]
+    items = get_list_items(list_id)
+    cache["mapping"][list_id] = items
+    save_cache(cache)
+    return items
+    
 def safe_sort_key(list_item):
     match = re.search(r'\d+', list_item["name"])
     return int(match.group()) if match else float('inf')
@@ -76,14 +79,6 @@ def delete_cache():
                 delete_url = f"{CACHE_URL}/{cache_id}"
                 conn.request("DELETE", delete_url, headers=headers)
                 delete_response = conn.getresponse()
-                if delete_response.status == 204:
-                    info(f"Deleted cache ID: {cache_id}")
-                else:
-                    silent_error(f"Failed to delete cache ID: {cache_id}, status code: {delete_response.status}")
                 delete_response.read()
-        else:
-            silent_error("No old caches to delete, only one or zero caches found.")
-    else:
-        silent_error(f"Failed to fetch caches, status code: {response.status}")
-
+                
     conn.close()
