@@ -1,9 +1,7 @@
 import os
 import re
 import json
-import subprocess
 import http.client
-from pathlib import Path
 from src import ids_pattern, CACHE_FILE
 from src.cloudflare import get_lists, get_rules, get_list_items
 
