@@ -1,6 +1,6 @@
 import argparse
 from src.domains import DomainConverter
-from src import utils, info, error, PREFIX
+from src import utils, info, silent_error, error, PREFIX
 from src.cloudflare import (
     create_list, update_list, create_rule, 
     update_rule, delete_list, delete_rule
@@ -62,6 +62,8 @@ class CloudflareManager:
                     update_list(list_id, remove_items, new_items)
                     info(f"Updated list: {list_name}")
                     self.cache["mapping"][list_id] = list(chunk)
+                else:
+                    silent_error(f"Skipped update list: {list_name}")
                 
                 new_list_ids.append(list_id)
             else:
@@ -85,6 +87,8 @@ class CloudflareManager:
                 updated_rule = update_rule(self.rule_name, cgp_rule["id"], new_list_ids)
                 info(f"Updated rule {updated_rule['name']}")
                 self.cache["rules"] = [updated_rule]
+            else:
+                silent_error(f"Skipping rule update as list IDs are unchanged: {cgp_rule['name']}")
         else:
             rule = create_rule(self.rule_name, new_list_ids)
             info(f"Created rule {rule['name']}")
@@ -107,9 +111,20 @@ class CloudflareManager:
             delete_list(lst["id"])
             info(f"Deleted list: {lst['name']}")
 
-        # Clear the cache after deletion
-        self.cache = {"lists": [], "rules": [], "mapping": {}}
+            # Remove the deleted list from the cache
+            self.cache["lists"] = [item for item in self.cache["lists"] if item["id"] != lst["id"]]
+
+            # Remove the mapping for the deleted list from the cache
+            if lst["id"] in self.cache["mapping"]:
+                del self.cache["mapping"][lst["id"]]
+
+            # Save updated cache
+            utils.save_cache(self.cache)
+
+        # Clear the rules cache after deletion
+        self.cache["rules"] = []
         utils.save_cache(self.cache)
+
 
 def main():
     parser = argparse.ArgumentParser(description="Cloudflare Manager Script")
