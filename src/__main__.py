@@ -2,8 +2,8 @@ import argparse
 from src.domains import DomainConverter
 from src import utils, info, error, PREFIX
 from src.cloudflare import (
-    get_lists, get_rules, create_list, update_list, create_rule, 
-    update_rule, delete_list, delete_rule, get_list_items
+    create_list, update_list, create_rule, 
+    update_rule, delete_list, delete_rule
 )
 
 
