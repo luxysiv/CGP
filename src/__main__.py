@@ -62,6 +62,7 @@ class CloudflareManager:
                     update_list(list_id, remove_items, new_items)
                     info(f"Updated list: {list_name}")
                     self.cache["mapping"][list_id] = list(chunk)
+                    utils.save_cache(self.cache)
                 
                 new_list_ids.append(list_id)
             else:
@@ -74,6 +75,7 @@ class CloudflareManager:
                     info(f"Created list: {lst['name']}")
                     self.cache["lists"].append(lst)
                     self.cache["mapping"][lst["id"]] = new_items
+                    utils.save_cache(self.cache)
                     new_list_ids.append(lst["id"])
 
         # Update the rule with the new list IDs
