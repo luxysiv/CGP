@@ -1,6 +1,6 @@
 import argparse
 from src.domains import DomainConverter
-from src import utils, info, silent_error, error, PREFIX
+from src import utils, info, error, PREFIX
 from src.cloudflare import (
     create_list, update_list, create_rule, 
     update_rule, delete_list, delete_rule
@@ -43,7 +43,7 @@ class CloudflareManager:
 
         # Process current lists and fill them with remaining domains
         new_list_ids = []
-        for i in existing_indexes + missing_indexes:
+        for i in sorted(existing_indexes + missing_indexes):
             list_name = f"{self.list_name} - {i:03d}"
             if list_name in list_name_to_id:
                 list_id = list_name_to_id[list_name]
@@ -62,9 +62,7 @@ class CloudflareManager:
                     update_list(list_id, remove_items, new_items)
                     info(f"Updated list: {list_name}")
                     self.cache["mapping"][list_id] = list(chunk)
-                else:
-                    silent_error(f"Skipped update list: {list_name}")
-                
+                    
                 new_list_ids.append(list_id)
             else:
                 # Create new lists for remaining domains
@@ -87,15 +85,13 @@ class CloudflareManager:
                 updated_rule = update_rule(self.rule_name, cgp_rule["id"], new_list_ids)
                 info(f"Updated rule {updated_rule['name']}")
                 self.cache["rules"] = [updated_rule]
-            else:
-                silent_error(f"Skipping rule update as list IDs are unchanged: {cgp_rule['name']}")
+            
         else:
             rule = create_rule(self.rule_name, new_list_ids)
             info(f"Created rule {rule['name']}")
             self.cache["rules"].append(rule)
-        
-        utils.save_cache(self.cache)
 
+        utils.save_cache(self.cache)
 
     def delete_resources(self):
         current_lists = utils.get_current_lists(self.cache, self.list_name)
