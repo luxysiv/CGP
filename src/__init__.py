@@ -5,6 +5,7 @@ from src.colorlog import logger
 
 # Constants
 PREFIX = "AdBlock-DNS-Filters"
+CACHE_FILE = "cloudflare_data.json"
 
 # Function to read .env file and return environment variables
 def dot_env(file_path=".env"):
