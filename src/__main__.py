@@ -48,7 +48,8 @@ class CloudflareManager:
 
         # Calculate list indexes
         list_name_to_id = {lst["name"]: lst["id"] for lst in current_lists}
-        all_indexes = set(range(1, (len(domains_to_block) + 999) // 1000 + 1))
+        existing_indexes = sorted([int(name.split('-')[-1]) for name in list_name_to_id.keys()])
+        all_indexes = set(range(1, max(existing_indexes + [(len(domains_to_block) + 999) // 1000]) + 1))
 
         # Process and update the lists
         new_list_ids = []
