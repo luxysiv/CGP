@@ -111,7 +111,7 @@ def retry(func):
             except Exception as e:
                 # Check for specific 429 Too Many Requests error
                 if "429" in str(e):
-                    silent_error(f"Attempt {attempt_number} failed with 429 Too Many Requests. Retrying indefinitely...")
+                    silent_error(f"Attempt {attempt_number} failed with {e}. Retrying...")
                     # Increase the wait time exponentially with a cap at 30 seconds
                     wait_time = min(2 ** (attempt_number - 1), 30)
                 else:
