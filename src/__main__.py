@@ -61,8 +61,6 @@ class CloudflareManager:
                     update_list(list_id, remove_items, new_items)
                     info(f"Updated list: {list_name}")
                     self.cache["mapping"][list_id] = list(chunk)
-                else:
-                    silent_error(f"Skipped update list: {list_name}")
                 
                 new_list_ids.append(list_id)
             else:
