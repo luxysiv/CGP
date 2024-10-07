@@ -84,8 +84,7 @@ class CloudflareManager:
                 updated_rule = update_rule(self.rule_name, cgp_rule["id"], new_list_ids)
                 info(f"Updated rule {updated_rule['name']}")
                 self.cache["rules"] = [updated_rule]
-            else:
-                silent_error(f"Skipping rule update as list IDs are unchanged: {cgp_rule['name']}")
+
         else:
             rule = create_rule(self.rule_name, new_list_ids)
             info(f"Created rule {rule['name']}")
