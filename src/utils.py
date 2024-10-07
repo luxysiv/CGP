@@ -1,129 +1,64 @@
 import os
 import re
 import json
+import subprocess
 import http.client
-from src import ids_pattern, CACHE_FILE
+from pathlib import Path
+from src import ids_pattern, info, silent_error, CACHE_FILE
 from src.cloudflare import get_lists, get_rules, get_list_items
 
-# Function to load the cache from a file
-def load_cache() -> dict:
-    """
-    Loads the cache from the CACHE_FILE if it exists.
 
-    Returns:
-        dict: The cache data, or an empty cache if the file doesn't exist.
-    """
+def load_cache():
     if os.path.exists(CACHE_FILE):
         with open(CACHE_FILE, 'r') as file:
             return json.load(file)
     return {"lists": [], "rules": [], "mapping": {}}
 
-# Function to save the cache to a file
-def save_cache(cache: dict) -> None:
-    """
-    Saves the current cache to the CACHE_FILE.
-
-    Args:
-        cache (dict): The cache data to be saved.
-    """
+def save_cache(cache):
     with open(CACHE_FILE, 'w') as file:
         json.dump(cache, file)
 
-# Function to retrieve current lists from cache or fetch them from Cloudflare
-def get_current_lists(cache: dict, list_name: str) -> list:
-    """
-    Retrieves the current lists from cache, or fetches them if not in cache.
-
-    Args:
-        cache (dict): The cache object.
-        list_name (str): The list name prefix to search for.
-
-    Returns:
-        list: The current lists.
-    """
+def get_current_lists(cache, list_name):
     if cache["lists"]:
+        info("Using cached lists.")
         return cache["lists"]
     current_lists = get_lists(list_name)
     cache["lists"] = current_lists
     save_cache(cache)
     return current_lists
 
-# Function to retrieve current rules from cache or fetch them from Cloudflare
-def get_current_rules(cache: dict, rule_name: str) -> list:
-    """
-    Retrieves the current rules from cache, or fetches them if not in cache.
-
-    Args:
-        cache (dict): The cache object.
-        rule_name (str): The rule name to search for.
-
-    Returns:
-        list: The current rules.
-    """
+def get_current_rules(cache, rule_name):
     if cache["rules"]:
+        info("Using cached rules.")
         return cache["rules"]
     current_rules = get_rules(rule_name)
     cache["rules"] = current_rules
     save_cache(cache)
     return current_rules
 
-# Function to get list items from cache or fetch from Cloudflare
-def get_list_items_cached(cache: dict, list_id: str) -> list:
-    """
-    Retrieves list items from cache or fetches them if not cached.
-
-    Args:
-        cache (dict): The cache object.
-        list_id (str): The ID of the list to retrieve items for.
-
-    Returns:
-        list: The list items.
-    """
+def get_list_items_cached(cache, list_id):
     if list_id in cache["mapping"]:
+        info(f"Using cached items for list {list_id}.")
         return cache["mapping"][list_id]
     items = get_list_items(list_id)
     cache["mapping"][list_id] = items
     save_cache(cache)
     return items
-
-# Function to safely sort lists based on numeric value in the name
-def safe_sort_key(list_item: dict) -> int:
-    """
-    Extracts a numeric key from a list item for safe sorting.
-
-    Args:
-        list_item (dict): The list item from which to extract the key.
-
-    Returns:
-        int: The extracted numeric key, or infinity if no match is found.
-    """
+    
+def safe_sort_key(list_item):
     match = re.search(r'\d+', list_item["name"])
     return int(match.group()) if match else float('inf')
 
-# Function to extract list IDs from a rule's traffic data
-def extract_list_ids(rule: dict) -> set:
-    """
-    Extracts list IDs from the traffic data in a rule.
-
-    Args:
-        rule (dict): The rule from which to extract list IDs.
-
-    Returns:
-        set: A set of extracted list IDs.
-    """
+def extract_list_ids(rule):
     if not rule or not rule.get('traffic'):
         return set()
     return set(ids_pattern.findall(rule['traffic']))
 
-# Function to delete caches from GitHub Actions
-def delete_cache() -> None:
-    """
-    Deletes cached items from GitHub Actions using the GitHub API.
-    """
+def delete_cache():
     GITHUB_TOKEN = os.getenv('GITHUB_TOKEN')
-    GITHUB_REPOSITORY = os.getenv('GITHUB_REPOSITORY')
+    GITHUB_REPOSITORY = os.getenv('GITHUB_REPOSITORY') 
     
-    BASE_URL = "api.github.com"
+    BASE_URL = f"api.github.com"
     CACHE_URL = f"/repos/{GITHUB_REPOSITORY}/actions/caches"
     headers = {
         "Authorization": f"Bearer {GITHUB_TOKEN}",
@@ -133,7 +68,6 @@ def delete_cache() -> None:
 
     conn = http.client.HTTPSConnection(BASE_URL)
 
-    # Request to get the list of caches
     conn.request("GET", CACHE_URL, headers=headers)
     response = conn.getresponse()
 
@@ -141,14 +75,13 @@ def delete_cache() -> None:
         data = response.read()
         caches = json.loads(data).get('actions_caches', [])
 
-        # If there are caches, delete them
-        if caches:
+        if len(caches) > 0:
             caches_to_delete = [cache['id'] for cache in caches]
         
             for cache_id in caches_to_delete:
                 delete_url = f"{CACHE_URL}/{cache_id}"
                 conn.request("DELETE", delete_url, headers=headers)
                 delete_response = conn.getresponse()
-                delete_response.read()  # Ensure response is processed
+                delete_response.read()
                 
     conn.close()
