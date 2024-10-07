@@ -28,7 +28,6 @@ def get_current_lists(cache, list_name):
 
 def get_current_rules(cache, rule_name):
     if cache["rules"]:
-        info("Using cached rules.")
         return cache["rules"]
     current_rules = get_rules(rule_name)
     cache["rules"] = current_rules
@@ -37,7 +36,6 @@ def get_current_rules(cache, rule_name):
 
 def get_list_items_cached(cache, list_id):
     if list_id in cache["mapping"]:
-        info(f"Using cached items for list {list_id}.")
         return cache["mapping"][list_id]
     items = get_list_items(list_id)
     cache["mapping"][list_id] = items
