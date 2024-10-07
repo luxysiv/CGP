@@ -32,7 +32,7 @@ jobs:
         id: cache-cloudflare-data
         uses: actions/cache@main
         with:
-          path: cloudflare_data.json
+          path: cloudflare_cache.json
           key: ${{ runner.os }}-cloudflare-data-${{ github.run_id }}
           restore-keys: |
             ${{ runner.os }}-cloudflare-data-
