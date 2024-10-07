@@ -20,7 +20,6 @@ class DomainConverter:
         self.whitelist_urls = self.read_urls("WHITELIST_URLS")
 
     def read_urls_from_file(self, filename):
-        """Read URLs from a file (INI or plain text)."""
         urls = []
         try:
             # Try reading as an INI file
@@ -39,12 +38,10 @@ class DomainConverter:
         return urls
     
     def read_urls_from_env(self, env_var):
-        """Read URLs from environment variable."""
         urls = os.getenv(env_var, "")
         return [url.strip() for url in urls.split() if url.strip()]
 
     def read_urls(self, env_var):
-        """Read URLs from both environment and corresponding file."""
         file_path = self.env_file_map[env_var]
         urls = self.read_urls_from_file(file_path)
         urls += self.read_urls_from_env(env_var)
@@ -52,7 +49,6 @@ class DomainConverter:
 
     @retry(**retry_config)
     def download_file(self, url):
-        """Download a file from the given URL with retry logic applied."""
         parsed_url = urlparse(url)
         if parsed_url.scheme == "https":
             conn = http.client.HTTPSConnection(parsed_url.netloc)
@@ -104,7 +100,6 @@ class DomainConverter:
         return data
 
     def process_urls(self):
-        """Process adlist and whitelist URLs to generate domain lists."""
         block_content = ""
         white_content = ""
         for url in self.adlist_urls:
