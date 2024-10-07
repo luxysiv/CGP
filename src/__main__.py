@@ -1,6 +1,6 @@
 import argparse
 from src.domains import DomainConverter
-from src import utils, info, silent_error, error, PREFIX
+from src import utils, info, error, PREFIX
 from src.cloudflare import (
     create_list, update_list, create_rule, 
     update_rule, delete_list, delete_rule
