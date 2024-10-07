@@ -20,7 +20,6 @@ def save_cache(cache):
 
 def get_current_lists(cache, list_name):
     if cache["lists"]:
-        info("Using cached lists.")
         return cache["lists"]
     current_lists = get_lists(list_name)
     cache["lists"] = current_lists
