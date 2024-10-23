@@ -1,14 +1,14 @@
 name: Add Rules to Cloudflare Gateway
 on:
   push:
-  schedule:
-    - cron: "0 * * * *"
   workflow_dispatch:
 
 jobs:
   run:
     name: Cloudflare Gateway
-    permissions: write-all
+    permissions: 
+      actions: write
+      contents: write
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -33,15 +33,21 @@ jobs:
 
       - name: Check Previous Workflow Run Status
         id: check_run
-        run: |
-          previous_run_status=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
-            https://api.github.com/repos/$GITHUB_REPOSITORY/actions/runs?per_page=5 | jq -r '[.workflow_runs[] | select(.conclusion != null)][0].conclusion')
-          if [ "$previous_run_status" == "null" ]; then
-            echo "No previous successful run found."
-            previous_run_status="failure"
-          fi
-          echo "Previous run status: $previous_run_status"
-          echo "run_status=$previous_run_status" >> $GITHUB_ENV
+        uses: actions/github-script@main
+        with:
+          script: |
+            const runs = await github.rest.actions.listWorkflowRunsForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 5,
+              status: 'completed'
+            });
+            const previousRun = runs.data.workflow_runs.find(run => run.id !== context.runId);
+            if (previousRun && previousRun.conclusion === "success") {
+              core.setOutput("run_status", "success");
+            } else {
+              core.setOutput("run_status", "failure");
+            }
 
       - name: Cache Data
         id: cache-cloudflare-data
@@ -51,7 +57,7 @@ jobs:
           key: ${{ runner.os }}-cloudflare-data-${{ github.run_id }}
           restore-keys: |
             ${{ runner.os }}-cloudflare-data-
-        if: env.run_status == 'success'  # Sử dụng cache nếu lần chạy trước thành công
+        if: steps.check_run.outputs.run_status == 'success'
 
       - name: Cloudflare Gateway Zero Trust 
         run: python -m src run
