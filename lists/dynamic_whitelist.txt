@@ -1,2 +1,3 @@
-#api-js.datadome.co
+api-js.datadome.co
 connect.facebook.net
+linkads.xyz
