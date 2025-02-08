@@ -127,12 +127,16 @@ def custom_stop_condition(exception, attempt_number):
         return False
     return stop_after_custom_attempts(attempt_number)
 
+# Set first retry when 429 2 minutes
+def custom_wait_time(attempt_number, last_exception=None):
+    if attempt_number == 1 and isinstance(last_exception, RateLimitException):
+        return 120
+    return wait_random_exponential(attempt_number, multiplier=1, max_wait=10)
+
 # Retry configuration:
 retry_config = {
     'stop': custom_stop_condition,
-    'wait': lambda attempt_number: wait_random_exponential(
-        attempt_number, multiplier=1, max_wait=10
-    ),
+    'wait': lambda attempt_number, last_exception=None: custom_wait_time(attempt_number, last_exception),
     'retry': retry_if_exception_type((HTTPException,)),
     'before_sleep': lambda retry_state: info(
         f"Sleeping before next retry ({retry_state['attempt_number']})"
