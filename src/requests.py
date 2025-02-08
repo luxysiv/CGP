@@ -116,7 +116,7 @@ def retry(stop=None, wait=None, retry=None, after=None, before_sleep=None):
                         raise
                     if before_sleep:
                         before_sleep({'attempt_number': attempt_number})
-                    wait_time = wait(attempt_number) if wait else 1
+                    wait_time = wait(attempt_number, e) if wait else 1
                     time.sleep(wait_time)
         return wrapper
     return decorator
