@@ -9,15 +9,29 @@ import zlib
 from io import BytesIO
 from functools import wraps
 from typing import Optional, Tuple
-from src import info, silent_error, error, CF_IDENTIFIER, CF_API_TOKEN
 
+# Mocking custom logging functions for demonstration
+def info(message):
+    print(f"[INFO] {message}")
 
+def error(message):
+    print(f"[ERROR] {message}")
+
+def silent_error(message):
+    print(f"[SILENT ERROR] {message}")
+
+# Mocking Cloudflare credentials
+CF_IDENTIFIER = "your_account_id"
+CF_API_TOKEN = "your_api_token"
+
+# Custom Exceptions
 class HTTPException(Exception):
     pass
 
 class RateLimitException(HTTPException):
     pass
 
+# Cloudflare Gateway Request Function
 def cloudflare_gateway_request(
     method: str, endpoint: str,
     body: Optional[str] = None,
@@ -73,12 +87,12 @@ def cloudflare_gateway_request(
     except (http.client.HTTPException, ssl.SSLError, socket.timeout, OSError) as e:
         # Log and raise a generic HTTP exception for network-related errors
         error_message = f"Network error occurred: {e}"
-        info(error_message)
+        silent_error(error_message)
         raise HTTPException(error_message)
     except json.JSONDecodeError:
         # Log and raise an exception if JSON decoding fails
         error_message = "Failed to decode JSON response"
-        info(error_message)
+        silent_error(error_message)
         raise HTTPException(error_message)
     finally:
         conn.close()
@@ -96,27 +110,42 @@ def wait_random_exponential(attempt_number, multiplier=1, max_wait=10):
 def retry_if_exception_type(exceptions):
     return lambda e: isinstance(e, exceptions)
 
+# Retry Decorator
 def retry(stop=None, wait=None, retry=None, after=None, before_sleep=None):
-    """Retry decorator with custom stop, wait, and retry conditions."""
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
             attempt_number = 0
+            first_rate_limit_encountered = False  # Cờ để theo dõi lần đầu gặp 429
             while True:
                 try:
                     attempt_number += 1
                     return func(*args, **kwargs)
+                except RateLimitException as e:
+                    if not first_rate_limit_encountered:
+                        # Lần đầu gặp 429, delay 2 phút
+                        first_rate_limit_encountered = True
+                        wait_time = 120  # 2 phút
+                        info(f"First rate limit encountered. Sleeping for {wait_time} seconds.")
+                        time.sleep(wait_time)
+                    else:
+                        # Các lần gặp 429 tiếp theo, tuân theo logic retry cũ
+                        if stop and stop(e, attempt_number):
+                            raise
+                        if before_sleep:
+                            before_sleep({'attempt_number': attempt_number})
+                        wait_time = wait(attempt_number) if wait else 1
+                        time.sleep(wait_time)
                 except Exception as e:
                     if retry and not retry(e):
                         raise
                     if after:
                         after({'attempt_number': attempt_number, 'outcome': e})
-                    # Apply different stop conditions based on exception type
                     if stop and stop(e, attempt_number):
                         raise
                     if before_sleep:
                         before_sleep({'attempt_number': attempt_number})
-                    wait_time = wait(attempt_number, e) if wait else 1
+                    wait_time = wait(attempt_number) if wait else 1
                     time.sleep(wait_time)
         return wrapper
     return decorator
@@ -124,25 +153,22 @@ def retry(stop=None, wait=None, retry=None, after=None, before_sleep=None):
 # Custom stop condition that handles RateLimitException and other exceptions separately
 def custom_stop_condition(exception, attempt_number):
     if isinstance(exception, RateLimitException):
-        return False
+        return False  # Không dừng lại khi gặp lỗi 429
     return stop_after_custom_attempts(attempt_number)
-
-# Set first retry when 429 2 minutes
-def custom_wait_time(attempt_number, last_exception=None):
-    if attempt_number == 1 and isinstance(last_exception, RateLimitException):
-        return 120
-    return wait_random_exponential(attempt_number, multiplier=1, max_wait=10)
 
 # Retry configuration:
 retry_config = {
     'stop': custom_stop_condition,
-    'wait': lambda attempt_number, last_exception=None: custom_wait_time(attempt_number, last_exception),
+    'wait': lambda attempt_number: wait_random_exponential(
+        attempt_number, multiplier=1, max_wait=10
+    ),
     'retry': retry_if_exception_type((HTTPException,)),
     'before_sleep': lambda retry_state: info(
         f"Sleeping before next retry ({retry_state['attempt_number']})"
     )
 }
 
+# Rate Limiter Class
 class RateLimiter:
     def __init__(self, interval: float = 1):
         self.interval = interval
@@ -156,6 +182,7 @@ class RateLimiter:
             time.sleep(sleep_time)
         self.timestamp = time.time()
 
+# Rate Limited Request Decorator
 def rate_limited_request(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
