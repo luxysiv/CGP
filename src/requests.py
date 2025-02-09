@@ -9,20 +9,7 @@ import zlib
 from io import BytesIO
 from functools import wraps
 from typing import Optional, Tuple
-
-# Mocking custom logging functions for demonstration
-def info(message):
-    print(f"[INFO] {message}")
-
-def error(message):
-    print(f"[ERROR] {message}")
-
-def silent_error(message):
-    print(f"[SILENT ERROR] {message}")
-
-# Mocking Cloudflare credentials
-CF_IDENTIFIER = "your_account_id"
-CF_API_TOKEN = "your_api_token"
+from src import info, silent_error, error, CF_IDENTIFIER, CF_API_TOKEN
 
 # Custom Exceptions
 class HTTPException(Exception):
@@ -123,13 +110,13 @@ def retry(stop=None, wait=None, retry=None, after=None, before_sleep=None):
                     return func(*args, **kwargs)
                 except RateLimitException as e:
                     if not first_rate_limit_encountered:
-                        # Lần đầu gặp 429, delay 2 phút
+                        # First time meeting 429, delay 2 minutes
                         first_rate_limit_encountered = True
-                        wait_time = 120  # 2 phút
-                        info(f"First rate limit encountered. Sleeping for {wait_time} seconds.")
+                        wait_time = 120
+                        info(f"Meet rate limit from Cloudflare. Sleeping for {wait_time} seconds.")
                         time.sleep(wait_time)
                     else:
-                        # Các lần gặp 429 tiếp theo, tuân theo logic retry cũ
+                        # Subsequent 429 encounters follow the old retry logic
                         if stop and stop(e, attempt_number):
                             raise
                         if before_sleep:
@@ -153,7 +140,7 @@ def retry(stop=None, wait=None, retry=None, after=None, before_sleep=None):
 # Custom stop condition that handles RateLimitException and other exceptions separately
 def custom_stop_condition(exception, attempt_number):
     if isinstance(exception, RateLimitException):
-        return False  # Không dừng lại khi gặp lỗi 429
+        return False
     return stop_after_custom_attempts(attempt_number)
 
 # Retry configuration:
