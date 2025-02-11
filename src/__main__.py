@@ -1,3 +1,4 @@
+
 import argparse
 from src.domains import DomainConverter
 from src import utils, info, silent_error, error, PREFIX
@@ -67,7 +68,10 @@ class CloudflareManager:
                     )
                     self.cache["mapping"][list_id] = list(chunk)
                 else:
-                    silent_error(f"Skipped update list: {list_name}")
+                    silent_error(
+                                f"Skipped update list: {list_name} "
+                                f"| Total domains in list: {len(chunk)}"
+                                )
                 
                 new_list_ids.append(list_id)
             else:
