@@ -1,4 +1,3 @@
-
 import argparse
 from src.domains import DomainConverter
 from src import utils, info, silent_error, error, PREFIX
