@@ -1,4 +1,3 @@
 api-js.datadome.co
 connect.facebook.net
 linkads.xyz
-aiservice.vn
