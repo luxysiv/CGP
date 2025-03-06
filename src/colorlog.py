@@ -2,35 +2,49 @@ import logging
 from datetime import datetime
 import os
 
-# Setup logging
 class ColoredLevelFormatter(logging.Formatter):
     COLOR_CODE = {
-        'DEBUG':    "\x1b[34m",  # Blue
-        'INFO':     "\x1b[32m",  # Green
-        'WARNING':  "\x1b[33m",  # Yellow
-        'ERROR':    "\x1b[31m",  # Red
-        'CRITICAL': "\x1b[41m",  # Red background
+        'DEBUG':    "\x1b[36m",
+        'INFO':     "\x1b[0m",
+        'WARNING':  "\x1b[33m",
+        'ERROR':    "\x1b[31m",
+        'CRITICAL': "\x1b[31;1m",
+        'RESET':    "\x1b[0m",
+        'DATE':     "\x1b[32m",
+        'CALLER':   "\x1b[36m"
     }
-    
-    TIMESTAMP_COLOR = "\x1b[36m"  # Cyan for timestamp
-    RESET_COLOR = "\x1b[0m"       # Reset color
 
     def format(self, record):
         levelname = record.levelname
         levelname_color = self.COLOR_CODE.get(levelname, "")
+        reset_color = self.COLOR_CODE['RESET']
+        date_color = self.COLOR_CODE['DATE']
+        caller_color = self.COLOR_CODE['CALLER']
+
+        current_time = datetime.fromtimestamp(record.created).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+
+        if os.path.basename(record.pathname) == "__init__.py":
+            caller_info = f"{os.path.basename(os.path.dirname(record.pathname))}:{record.funcName}:{record.lineno}"
+        else:
+            caller_info = f"{record.filename}:{record.funcName}:{record.lineno}"
+
+        original_message = record.getMessage()
+
+        formatted_message = (
+            f"{date_color}{current_time}{reset_color} | "
+            f"{levelname_color}{levelname:<8}{reset_color} | "
+            f"{caller_color}{caller_info}{reset_color} - "
+            f"{levelname_color}{original_message}{reset_color}"
+        )
+
+        record.msg = formatted_message
+        formatted_record = super().format(record)
+
+        return formatted_record
         
-        # Format timestamp, level, and message separately
-        timestamp = f"{self.TIMESTAMP_COLOR}{self.formatTime(record, self.datefmt)}{self.RESET_COLOR}"
-        levelname = f"{levelname_color}{levelname}{self.RESET_COLOR}"
-        message = f"{record.getMessage()}"
 
-        # Return the formatted log with consistent message color and different level/timestamp color
-        formatted_log = f"{timestamp} [{levelname}] {message}"
-        return formatted_log
-
-# Setup Logging with colors and custom format
 logging.getLogger().setLevel(logging.INFO)
-formatter = ColoredLevelFormatter(datefmt='%Y-%m-%d %H:%M:%S')
+formatter = ColoredLevelFormatter()
 console = logging.StreamHandler()
 console.setFormatter(formatter)
 logger = logging.getLogger()
